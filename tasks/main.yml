@@ -1,0 +1,11 @@
+- name: create ext volume for configs
+  file: state=directory path={{ ext_hadoop_conf_volume }}
+
+- name: check if a yarn-resourcemanager container is started
+  command: bash -c "docker ps | grep yarn-resourcemanager"
+  ignore_errors: True
+  register: result
+
+- name: start a yarn-resourcemanager container
+  command: docker run -d -h {{ ansible_hostname }}  --dns {{ ansible_docker0.ipv4.address }} --dns 8.8.8.8 --dns-search node.dc1.consul -p={{ yarn_resourcemanager_webapp_port }}:{{ yarn_resourcemanager_webapp_port }} -p={{ yarn_resourcemanager_scheduler_port }}:{{ yarn_resourcemanager_scheduler_port }} -p={{ yarn_resourcemanager_resourcetracker_port }}:{{ yarn_resourcemanager_resourcetracker_port }} -p={{ yarn_resourcemanager_port }}:{{ yarn_resourcemanager_port }} -v {{ ext_hadoop_conf_volume }}:/hadoop/conf -p={{ yarn_resourcemanager_admin_port }}:{{ yarn_resourcemanager_admin_port }} -name yarn-resourcemanager gitinsky/yarn-resourcemanager:0.1.0
+  when: result|failed
