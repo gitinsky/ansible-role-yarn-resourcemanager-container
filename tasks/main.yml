@@ -7,5 +7,29 @@
   register: result
 
 - name: start a yarn-resourcemanager container
-  command: docker run -d -h {{ ansible_hostname }}  --dns {{ ansible_docker0.ipv4.address }} --dns 8.8.8.8 --dns-search node.dc1.consul -p={{ yarn_resourcemanager_webapp_port }}:{{ yarn_resourcemanager_webapp_port }} -p={{ yarn_resourcemanager_scheduler_port }}:{{ yarn_resourcemanager_scheduler_port }} -p={{ yarn_resourcemanager_resourcetracker_port }}:{{ yarn_resourcemanager_resourcetracker_port }} -p={{ yarn_resourcemanager_port }}:{{ yarn_resourcemanager_port }} -v {{ ext_hadoop_conf_volume }}:/hadoop/conf -p={{ yarn_resourcemanager_admin_port }}:{{ yarn_resourcemanager_admin_port }} -name yarn-resourcemanager gitinsky/yarn-resourcemanager:0.1.0
+  command: docker run -d
+            {% if docker_net_false|default(False) %}
+            -n=false -v {{ ext_hadoop_conf_volume }}/hosts:/etc/hosts
+            {% endif %}
+            -h {{ ansible_hostname }}{% if docker_net_false|default(False) %}-yrm{% endif %}
+            --dns {{ ansible_docker0.ipv4.address }}
+            --dns {{ docker_dns_2 }}
+            --dns-search node.dc1.consul
+            -p={{ yarn_resourcemanager_webapp_port }}:{{ yarn_resourcemanager_webapp_port }}
+            -p={{ yarn_resourcemanager_scheduler_port }}:{{ yarn_resourcemanager_scheduler_port }}
+            -p={{ yarn_resourcemanager_resourcetracker_port }}:{{ yarn_resourcemanager_resourcetracker_port }}
+            -p={{ yarn_resourcemanager_port }}:{{ yarn_resourcemanager_port }}
+            -v {{ ext_hadoop_conf_volume }}:/hadoop/conf
+            -p={{ yarn_resourcemanager_admin_port }}:{{ yarn_resourcemanager_admin_port }}
+            -name yarn-resourcemanager gitinsky/yarn-resourcemanager:0.1.0
+  register: docker_id
   when: result|failed
+
+- name: start network
+  shell: /root/ovswork.sh br10
+         {{ docker_id.stdout }}
+         {{ network_map[ '' + ansible_hostname + '-yrm' ] }}/24
+         {{ network_map[ '_broadcast' ] }}
+         {{ network_map['_gateway'] }}
+  when: (docker_id.changed == True) and
+        (docker_net_false|default(False) == True)
